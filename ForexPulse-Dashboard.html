@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForexPulse — Trading Signal Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root {
+  --bg-primary: #0a0e17; --bg-secondary: #111827; --bg-card: #1a1f2e;
+  --bg-card-hover: #222838; --bg-input: #0d1117; --bg-modal: rgba(0,0,0,0.85);
+  --text-primary: #e8eaed; --text-secondary: #9ca3af; --text-muted: #6b7280; --text-bright: #fff;
+  --accent-blue: #3b82f6; --accent-blue-dim: #1d4ed8; --accent-purple: #8b5cf6;
+  --color-buy: #10b981; --color-buy-bg: rgba(16,185,129,0.12); --color-buy-border: rgba(16,185,129,0.3);
+  --color-sell: #ef4444; --color-sell-bg: rgba(239,68,68,0.12); --color-sell-border: rgba(239,68,68,0.3);
+  --color-warning: #f59e0b; --color-warning-bg: rgba(245,158,11,0.12);
+  --border-color: #1f2937; --border-light: #374151;
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px;
+  --font-sans: 'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-mono: 'JetBrains Mono','Fira Code',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg-primary)}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:3px}
+
+.header{background:var(--bg-secondary);border-bottom:1px solid var(--border-color);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-brand .logo{font-size:1.6rem}
+.header-brand h1{font-size:1.3rem;font-weight:700;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-brand .subtitle{font-size:.75rem;color:var(--text-muted)}
+.header-nav{display:flex;gap:4px}
+.header-nav button{background:transparent;border:1px solid transparent;color:var(--text-secondary);padding:8px 16px;border-radius:var(--radius-md);cursor:pointer;font-size:.85rem;font-weight:500;transition:all .2s;font-family:var(--font-sans)}
+.header-nav button:hover{background:var(--bg-card);color:var(--text-primary)}
+.header-nav button.active{background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)}
+.live-indicator{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--color-buy)}
+.live-dot{width:8px;height:8px;background:var(--color-buy);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.4)}50%{opacity:.7;box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+
+.main-content{flex:1;padding:16px 20px;max-width:1600px;margin:0 auto;width:100%}
+.pairs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+.pair-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:14px 16px;cursor:pointer;transition:all .2s;position:relative}
+.pair-card:hover{border-color:var(--accent-blue);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.pair-card.selected{border-color:var(--accent-blue);background:rgba(59,130,246,.08)}
+.pair-name{font-size:1rem;font-weight:700;color:var(--text-bright);font-family:var(--font-mono)}
+.pair-price{font-size:1.2rem;font-weight:600;font-family:var(--font-mono);margin:6px 0 4px}
+.pair-change{font-size:.8rem;font-weight:500;font-family:var(--font-mono)}
+.positive{color:var(--color-buy)}.negative{color:var(--color-sell)}
+
+.dashboard-grid{display:grid;grid-template-columns:1fr 340px;gap:16px}
+.chart-section,.sidebar-section{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:16px;transition:all .2s}
+.card:hover{border-color:var(--border-light)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-size:.95rem;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+
+.chart-container{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:16px;min-height:400px}
+.chart-controls{display:flex;gap:6px;margin-bottom:12px}
+.chart-controls button{background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);padding:5px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:.75rem;font-weight:500;transition:all .15s;font-family:var(--font-sans)}
+.chart-controls button:hover{border-color:var(--accent-blue);color:var(--text-primary)}
+.chart-controls button.active{background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)}
+.chart-wrapper{width:100%;height:380px;border-radius:var(--radius-sm);overflow:hidden}
+
+.indicators-panel{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.indicator-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:14px}
+.indicator-label{font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.indicator-value{font-size:1.3rem;font-weight:700;font-family:var(--font-mono);margin-top:6px}
+.indicator-status{font-size:.7rem;font-weight:500;margin-top:4px;padding:2px 8px;border-radius:20px;display:inline-block}
+.status-bullish{background:var(--color-buy-bg);color:var(--color-buy)}
+.status-bearish{background:var(--color-sell-bg);color:var(--color-sell)}
+.status-neutral{background:rgba(107,114,128,.15);color:var(--text-secondary)}
+
+.signal-item{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:14px;margin-bottom:10px;transition:all .2s;cursor:pointer}
+.signal-item:hover{transform:translateX(4px)}
+.signal-item.buy{border-left:3px solid var(--color-buy)}
+.signal-item.sell{border-left:3px solid var(--color-sell)}
+.signal-badge{padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.signal-badge.buy{background:var(--color-buy-bg);color:var(--color-buy)}
+.signal-badge.sell{background:var(--color-sell-bg);color:var(--color-sell)}
+.signal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.signal-strength{font-size:.65rem;color:var(--text-muted);font-weight:500}
+.signal-indicator{font-size:.75rem;color:var(--accent-blue);font-weight:600;margin-bottom:4px}
+.signal-reason{font-size:.78rem;color:var(--text-secondary);line-height:1.5;margin-bottom:6px}
+.signal-risk{font-size:.72rem;color:var(--color-warning);background:var(--color-warning-bg);padding:6px 10px;border-radius:var(--radius-sm);line-height:1.4}
+.signal-meta{display:flex;justify-content:space-between;margin-top:8px;font-size:.7rem;color:var(--text-muted);font-family:var(--font-mono)}
+
+.signal-popup-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg-modal);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.signal-popup{background:var(--bg-secondary);border:1px solid var(--border-light);border-radius:var(--radius-xl);padding:28px;max-width:480px;width:90%;animation:slideUp .3s ease;box-shadow:var(--shadow-lg)}
+.signal-popup.buy-popup{border-top:3px solid var(--color-buy)}
+.signal-popup.sell-popup{border-top:3px solid var(--color-sell)}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.popup-detail{margin-bottom:12px}
+.popup-detail label{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+.popup-detail .value{font-size:.95rem;color:var(--text-primary)}
+.popup-actions{display:flex;gap:10px;margin-top:20px}
+.popup-actions button{flex:1;padding:10px;border-radius:var(--radius-md);font-weight:600;cursor:pointer;font-size:.85rem;transition:all .2s;font-family:var(--font-sans);border:none}
+.btn-primary{background:var(--accent-blue);color:#fff}
+.btn-secondary{background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border-color)!important}
+.btn-buy{background:var(--color-buy)!important;color:#fff!important}
+.btn-sell{background:var(--color-sell)!important;color:#fff!important}
+
+.tooltip-trigger{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--border-color);color:var(--text-muted);font-size:.6rem;font-weight:700;cursor:help;transition:all .2s;flex-shrink:0}
+.tooltip-trigger:hover{background:var(--accent-blue);color:#fff}
+.tooltip-box{position:fixed;z-index:2000;background:var(--bg-secondary);border:1px solid var(--border-light);border-radius:var(--radius-md);padding:16px;max-width:360px;box-shadow:var(--shadow-lg);animation:fadeIn .15s ease}
+.tooltip-box h4{font-size:.85rem;color:var(--accent-blue);margin-bottom:6px}
+.tooltip-box .tt-short{font-size:.8rem;color:var(--text-primary);font-weight:500;margin-bottom:8px}
+.tooltip-box .tt-detail{font-size:.75rem;color:var(--text-secondary);line-height:1.5;margin-bottom:8px}
+.tooltip-box .tt-beginner{font-size:.72rem;color:var(--color-warning);background:var(--color-warning-bg);padding:8px 10px;border-radius:var(--radius-sm);line-height:1.4}
+
+.portfolio-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;text-align:center}
+.stat-label{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-value{font-size:1.4rem;font-weight:700;font-family:var(--font-mono)}
+.trade-form{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px}
+.trade-form h3{font-size:.95rem;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:.75rem;color:var(--text-muted);margin-bottom:5px;font-weight:500}
+.form-group select,.form-group input{width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:.85rem;font-family:var(--font-sans);transition:border-color .2s}
+.form-group select:focus,.form-group input:focus{outline:none;border-color:var(--accent-blue)}
+.trade-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.trade-buttons button{padding:10px;border:none;border-radius:var(--radius-md);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;font-family:var(--font-sans)}
+
+.positions-table{width:100%;border-collapse:collapse}
+.positions-table th{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border-color);font-weight:600}
+.positions-table td{padding:10px 12px;font-size:.82rem;border-bottom:1px solid var(--border-color);font-family:var(--font-mono)}
+.positions-table tr:hover{background:var(--bg-card-hover)}
+.close-btn{background:var(--color-sell-bg);color:var(--color-sell);border:1px solid var(--color-sell-border);padding:4px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:.72rem;font-weight:600;transition:all .2s;font-family:var(--font-sans)}
+.close-btn:hover{background:var(--color-sell);color:#fff}
+
+.risk-banner{background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(239,68,68,.08));border:1px solid rgba(245,158,11,.2);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px}
+.risk-banner .risk-icon{font-size:1.2rem;flex-shrink:0}
+.risk-banner .risk-text{font-size:.78rem;color:var(--color-warning);line-height:1.5}
+.risk-banner .risk-text strong{color:var(--text-primary)}
+
+.loading-container{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;color:var(--text-muted)}
+.spinner{width:36px;height:36px;border:3px solid var(--border-color);border-top-color:var(--accent-blue);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
+.empty-state .empty-icon{font-size:2.5rem;margin-bottom:12px}
+.empty-state p{font-size:.85rem;max-width:300px;margin:0 auto;line-height:1.5}
+
+.footer{background:var(--bg-secondary);border-top:1px solid var(--border-color);padding:16px 24px;text-align:center}
+.footer p{font-size:.72rem;color:var(--text-muted);line-height:1.6}
+.footer .disclaimer{color:var(--color-warning);font-weight:500}
+
+.toast{position:fixed;top:80px;right:20px;z-index:999;background:var(--bg-secondary);border:1px solid var(--color-buy-border);border-left:4px solid var(--color-buy);border-radius:var(--radius-md);padding:14px 18px;max-width:340px;box-shadow:var(--shadow-lg);animation:slideUp .3s ease;cursor:pointer}
+.toast.sell-toast{border-color:var(--color-sell-border);border-left-color:var(--color-sell)}
+
+@media(max-width:1200px){.dashboard-grid{grid-template-columns:1fr}.indicators-panel,.portfolio-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.header{flex-direction:column;gap:10px;padding:10px 16px}.pairs-grid{grid-template-columns:repeat(2,1fr)}.indicators-panel,.portfolio-stats{grid-template-columns:1fr 1fr}.main-content{padding:12px}}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <span class="logo">📈</span>
+      <div><h1>ForexPulse</h1><span class="subtitle">Trading Signal Dashboard</span></div>
+    </div>
+    <nav class="header-nav">
+      <button id="tab-dashboard" class="active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+      <button id="tab-portfolio" onclick="switchTab('portfolio')">💼 Portfolio</button>
+    </nav>
+    <div class="live-indicator"><span class="live-dot"></span>LIVE DATA</div>
+  </header>
+
+  <main class="main-content">
+    <!-- Dashboard View -->
+    <div id="view-dashboard">
+      <div class="risk-banner">
+        <span class="risk-icon">⚠️</span>
+        <div class="risk-text"><strong>Educational Tool — Not Financial Advice</strong><br>
+        This dashboard is for educational purposes only. Forex trading involves substantial risk of loss. Never trade with money you can't afford to lose.</div>
+      </div>
+      <div id="pairs-grid" class="pairs-grid"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <span style="font-size:.8rem;color:var(--text-muted);font-weight:500">Timeframe:</span>
+        <div class="chart-controls" id="period-controls"></div>
+      </div>
+      <div class="dashboard-grid">
+        <div class="chart-section">
+          <div class="chart-container">
+            <div class="card-header">
+              <div class="card-title"><span>📊</span> <span id="chart-pair-label">EUR/USD</span> Price Chart</div>
+              <div class="chart-controls">
+                <button class="active" onclick="setChartType('candlestick',this)">Candles</button>
+                <button onclick="setChartType('line',this)">Line</button>
+                <button id="btn-sma20" class="active" onclick="toggleSMA(20,this)" style="border-color:#f59e0b">SMA 20</button>
+                <button id="btn-sma50" class="active" onclick="toggleSMA(50,this)" style="border-color:#8b5cf6">SMA 50</button>
+              </div>
+            </div>
+            <div id="chart-wrapper" class="chart-wrapper"></div>
+          </div>
+          <div id="indicators-panel" class="indicators-panel"></div>
+        </div>
+        <div class="sidebar-section">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span>🔔</span> Trading Signals <span id="signal-count"></span></div>
+            </div>
+            <div id="signals-panel" class="signals-panel" style="max-height:500px;overflow-y:auto"></div>
+          </div>
+          <div class="card" style="background:rgba(59,130,246,.05)">
+            <div class="card-title" style="margin-bottom:10px"><span>📖</span> How to Read Signals</div>
+            <div style="font-size:.78rem;color:var(--text-secondary);line-height:1.6">
+              <p style="margin-bottom:8px"><span style="color:var(--color-buy)">🟢 BUY signals</span> suggest the price may go up. <span style="color:var(--color-sell)">🔴 SELL signals</span> suggest it may go down.</p>
+              <p style="margin-bottom:8px"><strong>Signal strength</strong> indicates confidence: 💪 Strong signals have more indicator confirmation than 🤏 Weak ones.</p>
+              <p>⚠️ <strong>Never trade on a single signal.</strong> Click any signal to see its full analysis and risk warning.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portfolio View -->
+    <div id="view-portfolio" style="display:none">
+      <div class="risk-banner">
+        <span class="risk-icon">⚠️</span>
+        <div class="risk-text"><strong>Simulated Trading Only</strong> — This portfolio uses virtual money ($10,000). No real money is at risk.</div>
+      </div>
+      <div id="portfolio-message"></div>
+      <div id="portfolio-stats" class="portfolio-stats"></div>
+      <div class="dashboard-grid">
+        <div class="chart-section">
+          <div class="card">
+            <div class="card-header"><div class="card-title"><span>📂</span> Open Positions (<span id="pos-count">0</span>)</div></div>
+            <div id="positions-container"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title"><span>📜</span> Trade History</div></div>
+            <div id="history-container"></div>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="trade-form">
+            <h3><span>🔄</span> New Trade</h3>
+            <div class="form-group">
+              <label>Currency Pair</label>
+              <select id="trade-pair"></select>
+            </div>
+            <div class="form-group">
+              <label>Quantity (units)</label>
+              <input type="number" id="trade-qty" value="1000" min="100" step="100">
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:8px">💡 1,000 units = micro lot • 10,000 = mini lot</div>
+            <div class="trade-buttons">
+              <button class="btn-buy" onclick="executeTrade('BUY')">▲ BUY (Long)</button>
+              <button class="btn-sell" onclick="executeTrade('SELL')">▼ SELL (Short)</button>
+            </div>
+          </div>
+          <div class="card" style="background:rgba(245,158,11,.05)">
+            <div class="card-title" style="margin-bottom:10px"><span>📚</span> Beginner Tips</div>
+            <div style="font-size:.78rem;color:var(--text-secondary);line-height:1.6">
+              <p style="margin-bottom:8px"><strong style="color:var(--color-warning)">🎯 Risk Management:</strong> Never risk more than 1-2% of your account on a single trade.</p>
+              <p style="margin-bottom:8px"><strong style="color:var(--accent-blue)">📊 Multiple Confirmations:</strong> Don't trade on a single indicator. Look for 2-3 indicators agreeing.</p>
+              <p><strong style="color:var(--accent-purple)">🧠 Psychology:</strong> Stick to your plan. Don't let emotions drive your trading decisions.</p>
+            </div>
+          </div>
+          <button onclick="resetPortfolio()" style="width:100%;padding:10px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);color:var(--text-muted);cursor:pointer;font-size:.8rem;font-family:var(--font-sans)">🔄 Reset Portfolio to $10,000</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p class="disclaimer">⚠️ This dashboard is for educational purposes only. It does not constitute financial advice.</p>
+    <p>Forex trading involves substantial risk of loss. All signals are generated by algorithms and should not be the sole basis for trading decisions.</p>
+    <p style="margin-top:6px">ForexPulse Dashboard © 2026 — Built for learning. Trade responsibly.</p>
+  </footer>
+</div>
+
+<!-- Signal Popup Container -->
+<div id="signal-popup-overlay" class="signal-popup-overlay" style="display:none" onclick="closeSignalPopup()">
+  <div id="signal-popup" class="signal-popup" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script>
+// ============================================================
+// ForexPulse Trading Signal Dashboard — Complete Engine
+// ============================================================
+
+// === CONFIGURATION ===
+const FOREX_PAIRS = ['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP'];
+const YAHOO_SYMBOLS = {'EUR/USD':'EURUSD=X','GBP/USD':'GBPUSD=X','USD/JPY':'USDJPY=X','AUD/USD':'AUDUSD=X','USD/CAD':'USDCAD=X','USD/CHF':'USDCHF=X','NZD/USD':'NZDUSD=X','EUR/GBP':'EURGBP=X'};
+const BASE_PRICES = {'EUR/USD':1.085,'GBP/USD':1.265,'USD/JPY':151.5,'AUD/USD':0.655,'USD/CAD':1.365,'USD/CHF':0.885,'NZD/USD':0.605,'EUR/GBP':0.858};
+
+// === STATE ===
+let state = {
+  selectedPair: 'EUR/USD',
+  period: '1mo',
+  chartType: 'candlestick',
+  showSMA20: true,
+  showSMA50: true,
+  pairsData: {},
+  pairDetail: null,
+  chart: null,
+  portfolio: JSON.parse(localStorage.getItem('forexpulse_portfolio')) || {
+    balance: 10000, initial_balance: 10000, positions: [], trade_history: [], next_id: 1
+  }
+};
+
+// === TOOLTIPS DATA ===
+const TOOLTIPS = {
+  RSI: {title:'RSI (Relative Strength Index)',short:'Measures if a currency pair is overbought or oversold',detail:'RSI ranges from 0-100. Below 30 = oversold (potential buy). Above 70 = overbought (potential sell).',beginner:'🎓 RSI works best in ranging markets. In strong trends, it can stay extreme for extended periods.'},
+  MACD: {title:'MACD',short:'Shows relationship between two moving averages',detail:'When MACD line crosses above signal line = bullish. When it crosses below = bearish.',beginner:'🎓 Look for MACD crossovers that align with the overall trend direction.'},
+  SMA: {title:'SMA (Simple Moving Average)',short:'Average price over a specific number of periods',detail:'20-period SMA shows short-term trend, 50-period shows medium-term. When shorter crosses above longer = Golden Cross (bullish).',beginner:'🎓 Moving averages are lagging indicators — they confirm trends rather than predict them.'},
+  STOP_LOSS: {title:'Stop Loss',short:'Auto-closes your trade at a set loss level',detail:'Professional traders ALWAYS use stop-losses. Never risk more than 1-2% of your account on a single trade.',beginner:'🎓 Set your stop-loss BEFORE entering a trade. Never move it further away.'},
+  PIP: {title:'Pip',short:'Smallest price movement in forex (usually 0.0001)',detail:'For most pairs, 1 pip = 0.0001. For JPY pairs, 1 pip = 0.01.',beginner:'🎓 In a standard lot (100,000 units), 1 pip = roughly $10 for USD pairs.'}
+};
+
+// === DATA GENERATION (Simulated realistic forex data) ===
+function generateForexData(pair, numPoints) {
+  const base = BASE_PRICES[pair] || 1.0;
+  const isJPY = pair.includes('JPY');
+  const vol = isJPY ? 0.0003 : 0.00025;
+  const now = Date.now();
+  const interval = 3600000; // 1 hour
+  const data = [];
+  let price = base * (1 + (Math.random() - 0.5) * 0.02);
+
+  // Use a seed based on pair + current hour for consistency
+  let seed = 0;
+  for (let i = 0; i < pair.length; i++) seed += pair.charCodeAt(i);
+  seed += Math.floor(now / 3600000);
+  const rand = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed / 2147483647) - 0.5; };
+
+  for (let i = numPoints - 1; i >= 0; i--) {
+    const t = now - i * interval;
+    const change = rand() * vol * 2;
+    price *= (1 + change);
+    const spread = vol * Math.abs(rand());
+    const o = price * (1 + rand() * vol * 0.5);
+    const c = price;
+    const h = Math.max(o, c) * (1 + Math.abs(rand()) * vol);
+    const l = Math.min(o, c) * (1 - Math.abs(rand()) * vol);
+    data.push({ time: Math.floor(t / 1000), open: o, high: h, low: l, close: c, timestamp: t });
+  }
+  return data;
+}
+
+function getNumPoints(period) {
+  return { '1d': 24, '5d': 120, '1mo': 500, '3mo': 1500 }[period] || 500;
+}
+
+// === TECHNICAL INDICATORS ===
+function computeRSI(closes, period = 14) {
+  const rsi = new Array(closes.length).fill(null);
+  if (closes.length < period + 1) return rsi;
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) avgGain += diff; else avgLoss += Math.abs(diff);
+  }
+  avgGain /= period; avgLoss /= period;
+  rsi[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? Math.abs(diff) : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    rsi[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  }
+  return rsi;
+}
+
+function computeEMA(data, period) {
+  const ema = []; const k = 2 / (period + 1);
+  ema[0] = data[0];
+  for (let i = 1; i < data.length; i++) ema[i] = data[i] * k + ema[i - 1] * (1 - k);
+  return ema;
+}
+
+function computeSMA(data, period) {
+  const sma = new Array(data.length).fill(null);
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += data[j];
+    sma[i] = sum / period;
+  }
+  return sma;
+}
+
+function computeMACD(closes) {
+  const ema12 = computeEMA(closes, 12);
+  const ema26 = computeEMA(closes, 26);
+  const macdLine = closes.map((_, i) => ema12[i] - ema26[i]);
+  const signalLine = computeEMA(macdLine, 9);
+  const histogram = macdLine.map((v, i) => v - signalLine[i]);
+  return { macdLine, signalLine, histogram };
+}
+
+function computeAllIndicators(candles) {
+  const closes = candles.map(c => c.close);
+  return {
+    rsi: computeRSI(closes),
+    ...computeMACD(closes),
+    sma20: computeSMA(closes, 20),
+    sma50: computeSMA(closes, 50)
+  };
+}
+
+// === SIGNAL GENERATION ===
+function generateSignals(candles, pair) {
+  const signals = [];
+  const closes = candles.map(c => c.close);
+  const n = closes.length;
+  if (n < 52) return signals;
+
+  const rsi = computeRSI(closes);
+  const macd = computeMACD(closes);
+  const sma20 = computeSMA(closes, 20);
+  const sma50 = computeSMA(closes, 50);
+  const isJPY = pair.includes('JPY');
+  const dp = isJPY ? 3 : 5;
+
+  for (let i = Math.max(51, n - 5); i < n; i++) {
+    const price = parseFloat(closes[i].toFixed(dp));
+    const ts = new Date(candles[i].timestamp).toLocaleString();
+
+    // RSI signals
+    if (rsi[i] !== null) {
+      if (rsi[i] < 30) {
+        signals.push({ type:'BUY', pair, price, timestamp:ts, indicator:'RSI',
+          strength: rsi[i] < 20 ? 'STRONG' : 'MODERATE',
+          reason: `RSI is oversold at ${rsi[i].toFixed(1)} (below 30), suggesting the pair may be undervalued and due for a bounce.`,
+          risk_warning: '⚠️ Oversold conditions can persist in strong downtrends. Always use a stop-loss and never risk more than 1-2% of your account.' });
+      } else if (rsi[i] > 70) {
+        signals.push({ type:'SELL', pair, price, timestamp:ts, indicator:'RSI',
+          strength: rsi[i] > 80 ? 'STRONG' : 'MODERATE',
+          reason: `RSI is overbought at ${rsi[i].toFixed(1)} (above 70), suggesting the pair may be overvalued and due for a pullback.`,
+          risk_warning: '⚠️ Overbought conditions can persist in strong uptrends. Consider partial position sizing and always set a stop-loss.' });
+      }
+    }
+
+    // MACD crossover
+    if (i > 0 && macd.macdLine[i] !== undefined && macd.signalLine[i] !== undefined) {
+      if (macd.macdLine[i-1] <= macd.signalLine[i-1] && macd.macdLine[i] > macd.signalLine[i]) {
+        signals.push({ type:'BUY', pair, price, timestamp:ts, indicator:'MACD', strength:'MODERATE',
+          reason: 'MACD line crossed above the signal line (bullish crossover), indicating potential upward momentum.',
+          risk_warning: '⚠️ MACD crossovers can produce false signals in ranging markets. Confirm with other indicators.' });
+      } else if (macd.macdLine[i-1] >= macd.signalLine[i-1] && macd.macdLine[i] < macd.signalLine[i]) {
+        signals.push({ type:'SELL', pair, price, timestamp:ts, indicator:'MACD', strength:'MODERATE',
+          reason: 'MACD line crossed below the signal line (bearish crossover), indicating potential downward momentum.',
+          risk_warning: '⚠️ MACD crossovers can lag behind price action. Use tight stop-losses and consider the overall trend.' });
+      }
+    }
+
+    // SMA crossover
+    if (i > 0 && sma20[i] && sma50[i] && sma20[i-1] && sma50[i-1]) {
+      if (sma20[i-1] <= sma50[i-1] && sma20[i] > sma50[i]) {
+        signals.push({ type:'BUY', pair, price, timestamp:ts, indicator:'MA Crossover', strength:'STRONG',
+          reason: '20-period SMA crossed above 50-period SMA (Golden Cross), a classic bullish signal.',
+          risk_warning: '⚠️ Moving average crossovers are lagging indicators. Use proper position sizing.' });
+      } else if (sma20[i-1] >= sma50[i-1] && sma20[i] < sma50[i]) {
+        signals.push({ type:'SELL', pair, price, timestamp:ts, indicator:'MA Crossover', strength:'STRONG',
+          reason: '20-period SMA crossed below 50-period SMA (Death Cross), a classic bearish signal.',
+          risk_warning: '⚠️ This is a lagging signal. Never chase a trade — wait for confirmation.' });
+      }
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  return signals.filter(s => {
+    const key = `${s.type}_${s.indicator}_${s.timestamp}`;
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  }).slice(-10);
+}
+
+// === UI RENDERING ===
+function switchTab(tab) {
+  document.getElementById('view-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
+  document.getElementById('view-portfolio').style.display = tab === 'portfolio' ? 'block' : 'none';
+  document.getElementById('tab-dashboard').className = tab === 'dashboard' ? 'active' : '';
+  document.getElementById('tab-portfolio').className = tab === 'portfolio' ? 'active' : '';
+  if (tab === 'portfolio') renderPortfolio();
+}
+
+function renderPairsGrid() {
+  const grid = document.getElementById('pairs-grid');
+  grid.innerHTML = FOREX_PAIRS.map(pair => {
+    const data = state.pairsData[pair];
+    if (!data) return '';
+    const isPos = data.changePct >= 0;
+    const dp = pair.includes('JPY') ? 3 : 5;
+    return `<div class="pair-card ${pair === state.selectedPair ? 'selected' : ''}" onclick="selectPair('${pair}')">
+      <div class="pair-name">${pair}</div>
+      <div class="pair-price" style="color:${isPos ? 'var(--color-buy)' : 'var(--color-sell)'}">${data.price.toFixed(dp)}</div>
+      <div class="pair-change ${isPos ? 'positive' : 'negative'}">${isPos ? '▲' : '▼'} ${Math.abs(data.changePct).toFixed(3)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPeriodControls() {
+  const periods = [{v:'1d',l:'1D'},{v:'5d',l:'5D'},{v:'1mo',l:'1M'},{v:'3mo',l:'3M'}];
+  document.getElementById('period-controls').innerHTML = periods.map(p =>
+    `<button class="${state.period === p.v ? 'active' : ''}" onclick="setPeriod('${p.v}')">${p.l}</button>`
+  ).join('');
+}
+
+function renderChart() {
+  const container = document.getElementById('chart-wrapper');
+  if (state.chart) { state.chart.remove(); state.chart = null; }
+  container.innerHTML = '';
+  document.getElementById('chart-pair-label').textContent = state.selectedPair + ' Price Chart';
+
+  if (!state.pairDetail || !state.pairDetail.candles.length) {
+    container.innerHTML = '<div class="loading-container"><div class="spinner"></div><p>Loading chart...</p></div>';
+    return;
+  }
+
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth, height: 370,
+    layout: { background: { color: '#1a1f2e' }, textColor: '#9ca3af', fontSize: 11, fontFamily: "'Inter', sans-serif" },
+    grid: { vertLines: { color: 'rgba(42,46,57,0.5)' }, horzLines: { color: 'rgba(42,46,57,0.5)' } },
+    crosshair: { mode: 0, vertLine: { color: '#3b82f6', width: 1, style: 2, labelBackgroundColor: '#3b82f6' }, horzLine: { color: '#3b82f6', width: 1, style: 2, labelBackgroundColor: '#3b82f6' } },
+    rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.1, bottom: 0.1 } },
+    timeScale: { borderColor: '#1f2937', timeVisible: true, secondsVisible: false }
+  });
+  state.chart = chart;
+
+  const candles = state.pairDetail.candles.filter((c, i, a) => i === 0 || c.time > a[i-1].time);
+
+  if (state.chartType === 'candlestick') {
+    const series = chart.addCandlestickSeries({ upColor:'#10b981', downColor:'#ef4444', borderUpColor:'#10b981', borderDownColor:'#ef4444', wickUpColor:'#10b981', wickDownColor:'#ef4444' });
+    series.setData(candles);
+  } else {
+    const series = chart.addLineSeries({ color:'#3b82f6', lineWidth:2 });
+    series.setData(candles.map(c => ({ time: c.time, value: c.close })));
+  }
+
+  if (state.showSMA20 && state.pairDetail.indicators.sma20) {
+    const smaData = state.pairDetail.indicators.sma20.map((v, i) => v !== null && candles[i] ? { time: candles[i].time, value: v } : null).filter(Boolean);
+    const unique = smaData.filter((d, i, a) => i === 0 || d.time > a[i-1].time);
+    if (unique.length > 0) { const s = chart.addLineSeries({ color:'#f59e0b', lineWidth:1, title:'SMA 20' }); s.setData(unique); }
+  }
+  if (state.showSMA50 && state.pairDetail.indicators.sma50) {
+    const smaData = state.pairDetail.indicators.sma50.map((v, i) => v !== null && candles[i] ? { time: candles[i].time, value: v } : null).filter(Boolean);
+    const unique = smaData.filter((d, i, a) => i === 0 || d.time > a[i-1].time);
+    if (unique.length > 0) { const s = chart.addLineSeries({ color:'#8b5cf6', lineWidth:1, title:'SMA 50' }); s.setData(unique); }
+  }
+
+  chart.timeScale().fitContent();
+  window.addEventListener('resize', () => { if (state.chart) state.chart.applyOptions({ width: container.clientWidth }); });
+}
+
+function renderIndicators() {
+  const panel = document.getElementById('indicators-panel');
+  if (!state.pairDetail) { panel.innerHTML = ''; return; }
+  const ind = state.pairDetail.indicators;
+  const lastRSI = ind.rsi.filter(v => v !== null).pop();
+  const lastMACD = ind.macdLine.filter(v => v !== null).pop();
+  const lastSignal = ind.signalLine.filter(v => v !== null).pop();
+  const lastSMA20 = ind.sma20.filter(v => v !== null).pop();
+  const lastSMA50 = ind.sma50.filter(v => v !== null).pop();
+  const price = state.pairDetail.currentPrice;
+
+  const rsiStatus = !lastRSI ? ['N/A','status-neutral'] : lastRSI < 30 ? ['Oversold','status-bullish'] : lastRSI > 70 ? ['Overbought','status-bearish'] : ['Neutral','status-neutral'];
+  const macdStatus = (!lastMACD || !lastSignal) ? ['N/A','status-neutral'] : lastMACD > lastSignal ? ['Bullish','status-bullish'] : ['Bearish','status-bearish'];
+  const trendStatus = (!lastSMA20 || !lastSMA50) ? ['N/A','status-neutral'] : lastSMA20 > lastSMA50 ? ['Uptrend','status-bullish'] : ['Downtrend','status-bearish'];
+  const priceStatus = (!price || !lastSMA20) ? ['N/A','status-neutral'] : price > lastSMA20 ? ['Above SMA','status-bullish'] : ['Below SMA','status-bearish'];
+
+  panel.innerHTML = `
+    <div class="indicator-card">
+      <div class="indicator-label">RSI (14) <span class="tooltip-trigger" onmouseenter="showTooltip(event,'RSI')" onmouseleave="hideTooltip()">?</span></div>
+      <div class="indicator-value" style="color:${lastRSI < 30 ? 'var(--color-buy)' : lastRSI > 70 ? 'var(--color-sell)' : 'var(--text-primary)'}">${lastRSI ? lastRSI.toFixed(1) : '—'}</div>
+      <span class="indicator-status ${rsiStatus[1]}">${rsiStatus[0]}</span>
+    </div>
+    <div class="indicator-card">
+      <div class="indicator-label">MACD <span class="tooltip-trigger" onmouseenter="showTooltip(event,'MACD')" onmouseleave="hideTooltip()">?</span></div>
+      <div class="indicator-value" style="color:${lastMACD > 0 ? 'var(--color-buy)' : 'var(--color-sell)'}">${lastMACD ? lastMACD.toFixed(5) : '—'}</div>
+      <span class="indicator-status ${macdStatus[1]}">${macdStatus[0]}</span>
+    </div>
+    <div class="indicator-card">
+      <div class="indicator-label">Trend (SMA) <span class="tooltip-trigger" onmouseenter="showTooltip(event,'SMA')" onmouseleave="hideTooltip()">?</span></div>
+      <div class="indicator-value" style="color:${trendStatus[1] === 'status-bullish' ? 'var(--color-buy)' : 'var(--color-sell)'}">${trendStatus[0] === 'N/A' ? '—' : trendStatus[0]}</div>
+      <span class="indicator-status ${trendStatus[1]}">${lastSMA20 ? 'SMA20: ' + lastSMA20.toFixed(4) : 'N/A'}</span>
+    </div>
+    <div class="indicator-card">
+      <div class="indicator-label">Price vs SMA</div>
+      <div class="indicator-value" style="color:${priceStatus[1] === 'status-bullish' ? 'var(--color-buy)' : 'var(--color-sell)'}">${priceStatus[0] === 'N/A' ? '—' : priceStatus[0]}</div>
+      <span class="indicator-status ${priceStatus[1]}">${lastSMA50 ? 'SMA50: ' + lastSMA50.toFixed(4) : 'N/A'}</span>
+    </div>`;
+}
+
+function renderSignals() {
+  const panel = document.getElementById('signals-panel');
+  const signals = state.pairDetail ? state.pairDetail.signals : [];
+  document.getElementById('signal-count').textContent = signals.length ? `(${signals.length})` : '';
+
+  if (!signals.length) {
+    panel.innerHTML = '<div class="empty-state"><div class="empty-icon">📡</div><p>No signals detected right now. Signals appear when indicators reach key levels.</p></div>';
+    return;
+  }
+
+  panel.innerHTML = signals.map((s, i) => `
+    <div class="signal-item ${s.type.toLowerCase()}" onclick="showSignalPopup(${i})">
+      <div class="signal-header">
+        <span class="signal-badge ${s.type.toLowerCase()}">${s.type === 'BUY' ? '▲ BUY' : '▼ SELL'}</span>
+        <span class="signal-strength">${s.strength === 'STRONG' ? '💪 Strong' : s.strength === 'MODERATE' ? '👍 Moderate' : '🤏 Weak'}</span>
+      </div>
+      <div class="signal-indicator">${s.indicator}</div>
+      <div class="signal-reason">${s.reason}</div>
+      <div class="signal-risk">${s.risk_warning}</div>
+      <div class="signal-meta"><span>${s.pair} @ ${s.price}</span><span>${s.timestamp}</span></div>
+    </div>`).join('');
+}
+
+function showSignalPopup(idx) {
+  const s = state.pairDetail.signals[idx];
+  if (!s) return;
+  const popup = document.getElementById('signal-popup');
+  popup.className = `signal-popup ${s.type.toLowerCase()}-popup`;
+  popup.innerHTML = `
+    <h2 style="font-size:1.2rem;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      ${s.type === 'BUY' ? '🟢' : '🔴'} ${s.type} Signal — ${s.pair}
+    </h2>
+    <div class="popup-detail"><label>Indicator</label><div class="value">${s.indicator}</div></div>
+    <div class="popup-detail"><label>Signal Strength</label><div class="value">${s.strength === 'STRONG' ? '💪 Strong' : s.strength === 'MODERATE' ? '👍 Moderate' : '🤏 Weak'}</div></div>
+    <div class="popup-detail"><label>Price at Signal</label><div class="value" style="font-family:var(--font-mono);font-size:1.1rem">${s.price}</div></div>
+    <div class="popup-detail"><label>Analysis</label><div class="value" style="font-size:.85rem;line-height:1.5">${s.reason}</div></div>
+    <div class="signal-risk" style="margin-top:12px">${s.risk_warning}</div>
+    <div class="popup-actions">
+      <button class="btn-secondary" onclick="closeSignalPopup()">Dismiss</button>
+      <button class="${s.type === 'BUY' ? 'btn-buy' : 'btn-sell'}" onclick="tradeFromSignal('${s.pair}','${s.type}');closeSignalPopup()">Sim ${s.type} Trade</button>
+    </div>`;
+  document.getElementById('signal-popup-overlay').style.display = 'flex';
+}
+
+function closeSignalPopup() { document.getElementById('signal-popup-overlay').style.display = 'none'; }
+
+// === TOOLTIP ===
+let tooltipEl = null;
+function showTooltip(event, key) {
+  const tt = TOOLTIPS[key]; if (!tt) return;
+  hideTooltip();
+  tooltipEl = document.createElement('div');
+  tooltipEl.className = 'tooltip-box';
+  tooltipEl.innerHTML = `<h4>${tt.title}</h4><div class="tt-short">${tt.short}</div><div class="tt-detail">${tt.detail}</div>${tt.beginner ? `<div class="tt-beginner">${tt.beginner}</div>` : ''}`;
+  const rect = event.target.getBoundingClientRect();
+  tooltipEl.style.top = (rect.bottom + 8) + 'px';
+  tooltipEl.style.left = Math.min(rect.left, window.innerWidth - 380) + 'px';
+  document.body.appendChild(tooltipEl);
+}
+function hideTooltip() { if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; } }
+
+// === PORTFOLIO ===
+function savePortfolio() { localStorage.setItem('forexpulse_portfolio', JSON.stringify(state.portfolio)); }
+
+function getCurrentPrice(pair) {
+  const d = state.pairsData[pair];
+  return d ? d.price : BASE_PRICES[pair] || 1.0;
+}
+
+function executeTrade(type) {
+  const pair = document.getElementById('trade-pair').value;
+  const qty = parseFloat(document.getElementById('trade-qty').value);
+  if (!qty || qty < 100) { showPortfolioMsg('error', '❌ Minimum quantity is 100 units.'); return; }
+  const price = getCurrentPrice(pair);
+  const cost = price * qty;
+  if (type === 'BUY' && cost > state.portfolio.balance) {
+    showPortfolioMsg('error', `❌ Insufficient balance. Need $${cost.toFixed(2)} but only have $${state.portfolio.balance.toFixed(2)}`); return;
+  }
+  const pos = { id: state.portfolio.next_id++, pair, type, entry_price: price, quantity: qty, timestamp: new Date().toLocaleString() };
+  state.portfolio.positions.push(pos);
+  if (type === 'BUY') state.portfolio.balance -= cost;
+  savePortfolio();
+  showPortfolioMsg('success', `✅ Opened ${type} position: ${qty} units of ${pair} at ${price.toFixed(5)}`);
+  renderPortfolio();
+}
+
+function tradeFromSignal(pair, type) {
+  document.getElementById('trade-pair').value = pair;
+  executeTrade(type);
+}
+
+function closePosition(id) {
+  const idx = state.portfolio.positions.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  const pos = state.portfolio.positions[idx];
+  const closePrice = getCurrentPrice(pos.pair);
+  const pnl = pos.type === 'BUY' ? (closePrice - pos.entry_price) * pos.quantity : (pos.entry_price - closePrice) * pos.quantity;
+  if (pos.type === 'BUY') state.portfolio.balance += closePrice * pos.quantity;
+  else state.portfolio.balance += pnl;
+  state.portfolio.trade_history.push({ ...pos, exit_price: closePrice, pnl: Math.round(pnl * 100) / 100, closed: new Date().toLocaleString() });
+  state.portfolio.positions.splice(idx, 1);
+  savePortfolio();
+  showPortfolioMsg('success', `✅ Closed ${pos.type} on ${pos.pair} at ${closePrice.toFixed(5)}. P&L: $${pnl.toFixed(2)}`);
+  renderPortfolio();
+}
+
+function resetPortfolio() {
+  if (!confirm('Reset portfolio to $10,000? All positions and history will be cleared.')) return;
+  state.portfolio = { balance: 10000, initial_balance: 10000, positions: [], trade_history: [], next_id: 1 };
+  savePortfolio();
+  showPortfolioMsg('success', '✅ Portfolio reset to $10,000.00');
+  renderPortfolio();
+}
+
+function showPortfolioMsg(type, text) {
+  const el = document.getElementById('portfolio-message');
+  el.innerHTML = `<div style="padding:10px 16px;border-radius:var(--radius-md);margin-bottom:16px;background:${type === 'success' ? 'var(--color-buy-bg)' : 'var(--color-sell-bg)'};color:${type === 'success' ? 'var(--color-buy)' : 'var(--color-sell)'};border:1px solid ${type === 'success' ? 'var(--color-buy-border)' : 'var(--color-sell-border)'};font-size:.85rem">${text}</div>`;
+  setTimeout(() => { el.innerHTML = ''; }, 5000);
+}
+
+function renderPortfolio() {
+  // Stats
+  let unrealizedPnl = 0;
+  state.portfolio.positions.forEach(p => {
+    const cur = getCurrentPrice(p.pair);
+    unrealizedPnl += p.type === 'BUY' ? (cur - p.entry_price) * p.quantity : (p.entry_price - cur) * p.quantity;
+  });
+  const realizedPnl = state.portfolio.trade_history.reduce((s, t) => s + (t.pnl || 0), 0);
+  const equity = state.portfolio.balance + unrealizedPnl;
+  const totalPnl = realizedPnl + unrealizedPnl;
+  const totalPct = ((equity - state.portfolio.initial_balance) / state.portfolio.initial_balance * 100);
+
+  document.getElementById('portfolio-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Balance</div><div class="stat-value">$${state.portfolio.balance.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+    <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">$${equity.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+    <div class="stat-card"><div class="stat-label">Total P&L</div><div class="stat-value ${totalPnl >= 0 ? 'positive' : 'negative'}">${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Return %</div><div class="stat-value ${totalPct >= 0 ? 'positive' : 'negative'}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(2)}%</div></div>`;
+
+  // Positions
+  const posContainer = document.getElementById('positions-container');
+  document.getElementById('pos-count').textContent = state.portfolio.positions.length;
+  if (state.portfolio.positions.length === 0) {
+    posContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No open positions. Use the trade form to open your first simulated trade!</p></div>';
+  } else {
+    posContainer.innerHTML = '<div style="overflow-x:auto"><table class="positions-table"><thead><tr><th>Pair</th><th>Type</th><th>Entry</th><th>Current</th><th>Qty</th><th>P&L</th><th>Action</th></tr></thead><tbody>' +
+      state.portfolio.positions.map(p => {
+        const cur = getCurrentPrice(p.pair);
+        const pnl = p.type === 'BUY' ? (cur - p.entry_price) * p.quantity : (p.entry_price - cur) * p.quantity;
+        const pnlPct = (pnl / (p.entry_price * p.quantity) * 100);
+        return `<tr><td style="font-weight:600">${p.pair}</td><td><span class="signal-badge ${p.type.toLowerCase()}">${p.type}</span></td><td>${p.entry_price.toFixed(5)}</td><td>${cur.toFixed(5)}</td><td>${p.quantity.toLocaleString()}</td><td style="color:${pnl >= 0 ? 'var(--color-buy)' : 'var(--color-sell)'};font-weight:600">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct.toFixed(2)}%)</td><td><button class="close-btn" onclick="closePosition(${p.id})">Close</button></td></tr>`;
+      }).join('') + '</tbody></table></div>';
+  }
+
+  // History
+  const histContainer = document.getElementById('history-container');
+  if (state.portfolio.trade_history.length === 0) {
+    histContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>No trade history yet. Close a position to see it here.</p></div>';
+  } else {
+    histContainer.innerHTML = '<div style="overflow-x:auto"><table class="positions-table"><thead><tr><th>Pair</th><th>Type</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&L</th><th>Closed</th></tr></thead><tbody>' +
+      [...state.portfolio.trade_history].reverse().map(t =>
+        `<tr><td style="font-weight:600">${t.pair}</td><td><span class="signal-badge ${t.type.toLowerCase()}">${t.type}</span></td><td>${t.entry_price.toFixed(5)}</td><td>${t.exit_price.toFixed(5)}</td><td>${t.quantity.toLocaleString()}</td><td style="color:${t.pnl >= 0 ? 'var(--color-buy)' : 'var(--color-sell)'};font-weight:600">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</td><td style="font-size:.72rem;color:var(--text-muted)">${t.closed}</td></tr>`
+      ).join('') + '</tbody></table></div>';
+  }
+
+  // Trade pair selector
+  const sel = document.getElementById('trade-pair');
+  if (sel.options.length === 0) {
+    FOREX_PAIRS.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); });
+  }
+}
+
+// === CHART CONTROLS ===
+function setChartType(type, btn) {
+  state.chartType = type;
+  btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+}
+
+function toggleSMA(period, btn) {
+  if (period === 20) state.showSMA20 = !state.showSMA20;
+  else state.showSMA50 = !state.showSMA50;
+  btn.classList.toggle('active');
+  renderChart();
+}
+
+function selectPair(pair) {
+  state.selectedPair = pair;
+  loadPairDetail();
+  renderPairsGrid();
+}
+
+function setPeriod(period) {
+  state.period = period;
+  loadPairDetail();
+  renderPeriodControls();
+}
+
+// === DATA LOADING ===
+function loadAllPairs() {
+  FOREX_PAIRS.forEach(pair => {
+    const candles = generateForexData(pair, 120);
+    const last = candles[candles.length - 1];
+    const prev = candles.length > 24 ? candles[candles.length - 25] : candles[0];
+    const change = last.close - prev.close;
+    const changePct = (change / prev.close) * 100;
+    state.pairsData[pair] = { price: last.close, change, changePct, high24h: Math.max(...candles.slice(-24).map(c => c.high)), low24h: Math.min(...candles.slice(-24).map(c => c.low)) };
+  });
+  renderPairsGrid();
+}
+
+function loadPairDetail() {
+  const pair = state.selectedPair;
+  const numPoints = getNumPoints(state.period);
+  const candles = generateForexData(pair, numPoints);
+  const indicators = computeAllIndicators(candles);
+  const signals = generateSignals(candles, pair);
+  const last = candles[candles.length - 1];
+  const prev = candles.length > 24 ? candles[candles.length - 25] : candles[0];
+
+  state.pairDetail = {
+    pair, candles, indicators, signals,
+    currentPrice: last.close,
+    change24h: last.close - prev.close,
+    changePct: ((last.close - prev.close) / prev.close) * 100
+  };
+
+  renderChart();
+  renderIndicators();
+  renderSignals();
+}
+
+// === INITIALIZATION ===
+function init() {
+  loadAllPairs();
+  renderPeriodControls();
+  loadPairDetail();
+  renderPortfolio();
+
+  // Auto-refresh every 30 seconds
+  setInterval(() => {
+    loadAllPairs();
+    loadPairDetail();
+  }, 30000);
+}
+
+// Start when page loads
+window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('load', init);
+if (document.readyState === 'complete' || document.readyState === 'interactive') init();
+</script>
+</body>
+</html>
